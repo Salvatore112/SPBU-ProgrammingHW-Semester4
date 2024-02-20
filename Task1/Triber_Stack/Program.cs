@@ -1,4 +1,5 @@
 ﻿using Triber_Stack;
+using static Triber_Stack.TriberStack;
 
 var stack = new TriberStack();
 
@@ -8,4 +9,8 @@ stack.Pop();
 
 Console.WriteLine(stack.Peek());
 
-Console.ReadKey();
+var stackBackOFf = new EliminationBackoffStack(10);
+stackBackOFf.Push(3);
+stackBackOFf.Push(2);
+stackBackOFf.Pop();
+Console.WriteLine(stackBackOFf.Peek());
