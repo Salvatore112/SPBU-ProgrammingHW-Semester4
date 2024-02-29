@@ -1,110 +1,65 @@
 import java.util.concurrent.atomic.AtomicReference
-import java.lang.RuntimeException
+import java.util.EmptyStackException
+import kotlin.random.Random
+import kotlinx.atomicfu.atomicArrayOfNulls
 
-class EliminationBackoffStack<T> (private val maxCounter : Int = 100, private val eliminationArraySize: Int = 6) {
-    private class Node<T> (val value: T?, val next: Node<T>?)
+class EliminationBackoffStack<T> (private val maxCounter : Int = 100, private val eliminationArraySize: Int = 10) {
+    private class Node<T> (val value: T, val next: Node<T>?)
 
-    private var h = AtomicReference<Node<T>?>(null)
+    private class Exchanger<T> (var value: T)
 
-    private enum class State {
-        Empty, Busy, Waiting, LoadingItem
-    }
+    private val head = AtomicReference<Node<T>?>(null)
 
-    private fun randomArrayIndex(arraySize: Int) = (0..<arraySize).random()
+    private val eliminationArray = atomicArrayOfNulls<Exchanger<T>?>(eliminationArraySize)
 
-    private class Exchanger<T> {
-        var state = AtomicReference(State.Empty)
-        var value: T? = null
-    }
-
-    private val eliminationArray = Array<Exchanger<T>>(eliminationArraySize) {Exchanger()}
-
-    fun push(x: T) {
-        while (true) {
-            val head = h.get()
-            val newHead = Node (x, head)
-            if (h.compareAndSet(head, newHead)) {
-                return
-            } else if (tryPushEliminationArray(x)) {
-                return
-            }
-        }
-    }
-
-    private fun tryPushEliminationArray(value: T): Boolean {
-        var counter = 0
-        while (counter != maxCounter) {
-            val randomExchanger = eliminationArray[randomArrayIndex(eliminationArraySize)]
-
-            if (randomExchanger.state.compareAndSet(State.Empty, State.LoadingItem)) {
-                randomExchanger.value = value
-                randomExchanger.state = AtomicReference(State.Waiting)
-
-                Thread.sleep(1000)
-
-                if (randomExchanger.state.compareAndSet(State.Waiting, State.Busy)) {
-                    randomExchanger.state = AtomicReference(State.Empty)
-                    return false
-                } else {
-                    randomExchanger.state = AtomicReference(State.Empty)
-                    return true
+    private fun eliminationPush(value: T) {
+        val randomExchanger = eliminationArray[Random.nextInt(eliminationArraySize)]
+        if (randomExchanger.value == null) {
+            if (randomExchanger.compareAndSet(null, Exchanger(value))) {
+                if (randomExchanger.getAndSet(null) == null) {
+                    return
                 }
             }
-            counter ++
         }
-        return false
+        push(value) // Trying to push again
     }
 
-    private fun tryPop(): Pair<Node<T>?, Boolean> {
-        val head = h.get()
-        if (h.compareAndSet(head, head?.next)) {
-            return Pair(head, true)
-        }
-        return Pair(null, false)
+    fun push(value: T) {
+        val currentHead = head.get()
+        val newHead = Node(value, currentHead)
+        if (head.compareAndSet(currentHead, newHead)) {
+            return
+        } // Trying to push once the old way
+        eliminationPush(value) // If cas failed we try to push through eliminationArray
     }
 
-    private fun tryPopEliminate(): T? {
+    fun pop(): T {
+        val currentHead = head.get() ?: throw EmptyStackException()
+        if (head.compareAndSet(currentHead, currentHead.next) && currentHead.value != null) {
+            return currentHead.value
+        } // Trying to pop without elimination once
+
+        val randomEliminationArrayIndex = Random.nextInt(eliminationArraySize)
         var counter = 0
-        while (counter != maxCounter) {
-            val randomExchanger = eliminationArray[randomArrayIndex(eliminationArraySize)]
-
-            if (randomExchanger.state.compareAndSet(State.Waiting, State.Busy)) {
-                val takenValue = randomExchanger.value
-                randomExchanger.value = null
-                if (!randomExchanger.state.compareAndSet(State.Busy, State.Empty)) {
-                    throw RuntimeException("Couldn't change an exchanger's state")
+        while (counter < maxCounter) {
+            val randomExchanger = eliminationArray[randomEliminationArrayIndex].value
+            if (randomExchanger != null) {
+                if (eliminationArray[randomEliminationArrayIndex].compareAndSet(randomExchanger, null)) {
+                    return randomExchanger.value
                 }
-                return takenValue
             }
             counter++
-        }
-        return null
-    }
-
-    fun pop(): T? {
-        var counter = 0
+        } // Trying to pop with elimination up to maxCounter times
 
         while (true) {
-            val (node, casResult) = tryPop()
-
-            if (casResult) {
-                if (node != null) {
-                    return node.value
-                }
-                if (counter == maxCounter) throw RuntimeException("Too many attempts to pop an element")
-
-                counter++
-                Thread.sleep(1000)
+            val currentHead = head.get() ?: throw EmptyStackException()
+            if (head.compareAndSet(currentHead, currentHead.next)) {
+                return currentHead.value
             }
-
-            val popAttempt = tryPopEliminate()
-            if (popAttempt != null) {
-                return popAttempt
-            }
-        }
+        } // Trying to pop with cas loop till it's done
     }
 
-    fun peek() : T? {
-        return (h.get())?.value
+    fun peek(): T? {
+        return head.get()?.value ?: return null
     }
 }
