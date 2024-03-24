@@ -4,7 +4,7 @@ import org.jetbrains.kotlinx.lincheck.strategy.stress.StressOptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 
-class ParticularDataTests {
+class ParticularDataTestsBackoff {
     @Test
     fun popOnEmptyStackShouldReturnNull() {
         val stack = EliminationBackoffStack<Int>()
@@ -24,8 +24,8 @@ class ParticularDataTests {
     }
 }
 
-class RandomStressTesting {
-    private val stack = LockFreeStack<Int>()
+class RandomStressTestingBackoff {
+    private val stack = EliminationBackoffStack<Int>()
 
     @Operation
     fun push(x: Int) = stack.push(x)
