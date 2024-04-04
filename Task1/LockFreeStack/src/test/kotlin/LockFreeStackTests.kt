@@ -7,13 +7,13 @@ import org.junit.jupiter.api.Assertions.assertEquals
 class ParticularDataTests {
     @Test
     fun popOnEmptyStackShouldReturnNull() {
-        val stack = EliminationBackoffStack<Int>()
+        val stack = LockFreeStack<Int>()
         assertEquals(stack.peek(), null)
     }
 
     @Test
     fun popPeekPushShouldWorkAsExpected() {
-        val stack = EliminationBackoffStack<Int>()
+        val stack = LockFreeStack<Int>()
         stack.push(10)
         stack.push(100)
         stack.push(1000)

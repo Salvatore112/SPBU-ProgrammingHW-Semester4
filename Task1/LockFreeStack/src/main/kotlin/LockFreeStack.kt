@@ -1,11 +1,11 @@
 import java.util.concurrent.atomic.AtomicReference
 
-class LockFreeStack<T> {
+class LockFreeStack<T> : ConcurrentStack<T> {
     private class Node<T> (val value: T, val next: Node<T>?)
 
     private var h = AtomicReference<Node<T>?>(null)
 
-    fun pop(): T? {
+    override fun pop(): T? {
         while (true) { //Cas loop
             val head = h.get() ?: return null
             if (h.compareAndSet(head, head.next)) {
@@ -14,7 +14,7 @@ class LockFreeStack<T> {
         }
     }
 
-    fun push(x: T) {
+    override fun push(x: T) {
         while (true) {
             val head = h.get()
             val newHead = Node (x, head)
@@ -24,7 +24,10 @@ class LockFreeStack<T> {
         }
     }
 
-    fun peek() : T? {
+    override fun peek() : T? {
         return (h.get())?.value
+    }
+    override fun empty() : Boolean {
+        return h.get() == null
     }
 }
