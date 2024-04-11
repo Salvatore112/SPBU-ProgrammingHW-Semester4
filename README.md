@@ -41,3 +41,11 @@ ThreadSanitizer или их аналогом.
 Комментарий. Язык программирования — C/С++ в силу особенностей инструмента
 
 [Решение](https://github.com/Salvatore112/mandelbrot)
+
+# Задача 5. Пул потоков
+github.com/Stanislav-Sartasov/spbu-mm-dotnet-introduction/blob/main/Common/Tasks.pdf
+Задача “Пул потоков”
+
+Здесь необходимо предложить максимально развёрнутый механизм верификации
+вашего решения
+[Решение]()
