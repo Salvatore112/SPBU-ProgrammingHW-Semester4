@@ -43,7 +43,7 @@ ThreadSanitizer или их аналогом.
 [Решение](https://github.com/Salvatore112/mandelbrot)
 
 # Задача 5. Пул потоков
-github.com/Stanislav-Sartasov/spbu-mm-dotnet-introduction/blob/main/Common/Tasks.pdf
+[Task](github.com/Stanislav-Sartasov/spbu-mm-dotnet-introduction/blob/main/Common/Tasks.pdf)
 Задача “Пул потоков”
 
 Здесь необходимо предложить максимально развёрнутый механизм верификации
