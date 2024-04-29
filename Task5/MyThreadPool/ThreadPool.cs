@@ -12,7 +12,6 @@ public class ThreadPool
     readonly private int taskCompletionTimeLimit;
     readonly private ThreadPoolThread[] threads;
     readonly private CancellationTokenSource cancellationTokenSource;
-    readonly private object lockObject;
 
     public ConcurrentQueue<Action> TasksQueue { get; private set; }
 
@@ -41,21 +40,17 @@ public class ThreadPool
     /// </summary>
     public IMyTask<TResult> Enqueue<TResult>(Func<TResult> function, ManualResetEvent? upperTaskIsFinished = null)
     {
-        lock (lockObject)
+
+        if (cancellationTokenSource.IsCancellationRequested)
         {
-            if (cancellationTokenSource.IsCancellationRequested)
-            {
-                throw new InvalidOperationException("Thread pool is no longer accepting any new tasks");
-            }
-
-            var newTask = upperTaskIsFinished == null ? new MyTask<TResult>(function, this) : new MyTask<TResult>(function, this, upperTaskIsFinished);
-            lock (TasksQueue)
-            {
-                TasksQueue.Enqueue(() => newTask.Evaluate());
-            }
-
-            return newTask;
+            throw new InvalidOperationException("Thread pool is no longer accepting any new tasks");
         }
+
+        var newTask = upperTaskIsFinished == null ? new MyTask<TResult>(function, this) : new MyTask<TResult>(function, this, upperTaskIsFinished);
+        TasksQueue.Enqueue(() => newTask.Evaluate());
+
+        return newTask;
+
     }
 
     /// <summary>
@@ -63,31 +58,30 @@ public class ThreadPool
     /// </summary>
     public void Dispose()
     {
-        lock (lockObject)
-        {
-            IsBeingDisposedOf = true;
-            cancellationTokenSource.Cancel();
 
-            foreach (ThreadPoolThread thread in threads)
+        IsBeingDisposedOf = true;
+        cancellationTokenSource.Cancel();
+
+        foreach (ThreadPoolThread thread in threads)
+        {
+            thread.ThreadJoin(taskCompletionTimeLimit);
+            if (!thread.Idle)
             {
-                thread.ThreadJoin(taskCompletionTimeLimit);
-                if (!thread.Idle)
-                {
-                    throw new Exception("Task completion took longer than it was allowed");
-                }
+                throw new Exception("Task completion took longer than it was allowed");
             }
         }
+
     }
 
     private class ThreadPoolThread
     {
-        readonly private Thread threadItself;
-        readonly private ThreadPool threadPool;
+        private readonly Thread threadItself;
+        private readonly ThreadPool threadPool;
         private Action? task;
 
         public bool Idle { get; set; } = true;
 
-        public void TaskExecutionLoop(CancellationToken cancellationToken)
+        public async void TaskExecutionLoop(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -96,7 +90,7 @@ public class ThreadPool
                     return;
                 }
 
-                if (!threadPool.TasksQueue.IsEmpty)
+                if (!threadPool.NoTasksInQueue)
                 {
                     var taskWasFetched = threadPool.TasksQueue.TryDequeue(out task);
                     if (taskWasFetched && task != null)
@@ -105,6 +99,10 @@ public class ThreadPool
                         task();
                         Idle = true;
                     }
+                }
+                else
+                {
+                    Thread.Sleep(1000);
                 }
             }
         }
@@ -241,6 +239,5 @@ public class ThreadPool
         }
 
         taskCompletionTimeLimit = threadJoinTime;
-        lockObject = new object();
     }
 }
