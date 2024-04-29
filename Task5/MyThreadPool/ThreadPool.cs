@@ -102,7 +102,7 @@ public class ThreadPool
                 }
                 else
                 {
-                    Thread.Sleep(1000);
+                    Thread.Sleep(100);
                 }
             }
         }
