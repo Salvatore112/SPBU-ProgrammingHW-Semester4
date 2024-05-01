@@ -12,7 +12,9 @@ public class ThreadPool
     readonly private int taskCompletionTimeLimit;
     readonly private ThreadPoolThread[] threads;
     readonly private CancellationTokenSource cancellationTokenSource;
-
+    readonly private ManualResetEvent thereAreTasksInQueue;
+    readonly private AutoResetEvent newTaskGotSubmitted;
+    private WaitHandle[] waitHandlesForThreadLoop;
     public ConcurrentQueue<Action> TasksQueue { get; private set; }
 
     /// <summary>
@@ -48,9 +50,8 @@ public class ThreadPool
 
         var newTask = upperTaskIsFinished == null ? new MyTask<TResult>(function, this) : new MyTask<TResult>(function, this, upperTaskIsFinished);
         TasksQueue.Enqueue(() => newTask.Evaluate());
-
+        newTaskGotSubmitted.Set();
         return newTask;
-
     }
 
     /// <summary>
@@ -58,10 +59,9 @@ public class ThreadPool
     /// </summary>
     public void Dispose()
     {
-
         IsBeingDisposedOf = true;
         cancellationTokenSource.Cancel();
-
+        thereAreTasksInQueue.Set();
         foreach (ThreadPoolThread thread in threads)
         {
             thread.ThreadJoin(taskCompletionTimeLimit);
@@ -70,7 +70,6 @@ public class ThreadPool
                 throw new Exception("Task completion took longer than it was allowed");
             }
         }
-
     }
 
     private class ThreadPoolThread
@@ -85,9 +84,19 @@ public class ThreadPool
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                WaitHandle.WaitAny(threadPool.waitHandlesForThreadLoop);
                 if (cancellationToken.IsCancellationRequested)
                 {
                     return;
+                }
+
+                if (!threadPool.NoTasksInQueue)
+                {
+                    threadPool.thereAreTasksInQueue.Set();
+                }
+                else
+                {
+                    threadPool.thereAreTasksInQueue.Reset();
                 }
 
                 if (!threadPool.NoTasksInQueue)
@@ -100,9 +109,14 @@ public class ThreadPool
                         Idle = true;
                     }
                 }
+
+                if (!threadPool.NoTasksInQueue)
+                {
+                    threadPool.thereAreTasksInQueue.Set();
+                }
                 else
                 {
-                    Thread.Sleep(100);
+                    threadPool.thereAreTasksInQueue.Reset();
                 }
             }
         }
@@ -231,6 +245,13 @@ public class ThreadPool
         TasksQueue = new ConcurrentQueue<Action>();
         threads = new ThreadPoolThread[numberOfThreads];
         cancellationTokenSource = new CancellationTokenSource();
+        thereAreTasksInQueue = new ManualResetEvent(false);
+        newTaskGotSubmitted = new AutoResetEvent(false);
+        waitHandlesForThreadLoop = new WaitHandle[2]
+        {
+            newTaskGotSubmitted,
+            thereAreTasksInQueue,
+        };
 
         for (var i = 0; i < numberOfThreads; i++)
         {
