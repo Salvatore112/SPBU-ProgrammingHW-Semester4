@@ -13,6 +13,7 @@ public class ThreadPool
     readonly private ThreadPoolThread[] threads;
     readonly private CancellationTokenSource cancellationTokenSource;
     readonly private ManualResetEvent thereAreTasksInQueue;
+    readonly private ManualResetEvent disposalEvent;
     readonly private AutoResetEvent newTaskGotSubmitted;
     private WaitHandle[] waitHandlesForThreadLoop;
     public ConcurrentQueue<Action> TasksQueue { get; private set; }
@@ -61,7 +62,7 @@ public class ThreadPool
     {
         IsBeingDisposedOf = true;
         cancellationTokenSource.Cancel();
-        thereAreTasksInQueue.Set();
+        disposalEvent.Set();
         foreach (ThreadPoolThread thread in threads)
         {
             thread.ThreadJoin(taskCompletionTimeLimit);
@@ -90,13 +91,16 @@ public class ThreadPool
                     return;
                 }
 
-                if (!threadPool.NoTasksInQueue)
+                lock (threadPool.thereAreTasksInQueue)
                 {
-                    threadPool.thereAreTasksInQueue.Set();
-                }
-                else
-                {
-                    threadPool.thereAreTasksInQueue.Reset();
+                    if (!threadPool.NoTasksInQueue)
+                    {
+                        threadPool.thereAreTasksInQueue.Set();
+                    }
+                    else
+                    {
+                        threadPool.thereAreTasksInQueue.Reset();
+                    }
                 }
 
                 if (!threadPool.NoTasksInQueue)
@@ -110,13 +114,16 @@ public class ThreadPool
                     }
                 }
 
-                if (!threadPool.NoTasksInQueue)
+                lock (threadPool.thereAreTasksInQueue)
                 {
-                    threadPool.thereAreTasksInQueue.Set();
-                }
-                else
-                {
-                    threadPool.thereAreTasksInQueue.Reset();
+                    if (!threadPool.NoTasksInQueue)
+                    {
+                        threadPool.thereAreTasksInQueue.Set();
+                    }
+                    else
+                    {
+                        threadPool.thereAreTasksInQueue.Reset();
+                    }
                 }
             }
         }
@@ -246,11 +253,13 @@ public class ThreadPool
         threads = new ThreadPoolThread[numberOfThreads];
         cancellationTokenSource = new CancellationTokenSource();
         thereAreTasksInQueue = new ManualResetEvent(false);
+        disposalEvent = new ManualResetEvent(false);
         newTaskGotSubmitted = new AutoResetEvent(false);
-        waitHandlesForThreadLoop = new WaitHandle[2]
+        waitHandlesForThreadLoop = new WaitHandle[3]
         {
             newTaskGotSubmitted,
             thereAreTasksInQueue,
+            disposalEvent,
         };
 
         for (var i = 0; i < numberOfThreads; i++)
