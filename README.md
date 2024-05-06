@@ -48,4 +48,5 @@ ThreadSanitizer или их аналогом.
 
 Здесь необходимо предложить максимально развёрнутый механизм верификации
 вашего решения
-[Решение]()
+
+[Решение](https://github.com/Salvatore112/SPBU-ProgrammingHW-Semester4/tree/Task5/Task5)
