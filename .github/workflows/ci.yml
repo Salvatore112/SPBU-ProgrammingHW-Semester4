@@ -1,0 +1,34 @@
+on:
+  push:
+    branches:
+      - main 
+      - Task4
+
+  pull_request:
+    branches:
+      - main
+      - Task4
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Task4/Concurrent_BST
+
+    steps:
+    - name: Checkout project sources
+      uses: actions/checkout@v4
+
+    - name: Setup gradle
+      uses: gradle/gradle-build-action@v2
+
+    - name: Permissions
+      run: chmod +x gradlew
+
+    - name: Build
+      run: ./gradlew build
+
+    - name: Test
+      run: ./gradlew test
