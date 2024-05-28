@@ -8,4 +8,4 @@
 
 Эксперимент заключается в проверке того, сколько операций push и pop выполнятся за определенный промежуток времени (10 секунд) на разном числе потоков
 
-[Результаты](WIP)
+[Результаты](https://github.com/Salvatore112/SPBU-ProgrammingHW-Semester4/blob/Task1/Task1/LockFreeStack/results.xlsx)
